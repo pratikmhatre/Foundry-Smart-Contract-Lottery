@@ -73,7 +73,7 @@ contract Raffle is VRFConsumerBaseV2 {
         emit userEnteredRaffle(msg.sender, block.timestamp);
     }
 
-    function pickWinner() external {
+    function pickWinner() internal {
         //check if enough time interval has passed since last pickWinner
         if (block.timestamp - s_lastWinnerDrawnTime < i_minTimeInterval)
             revert Raffle__NoEnoughTimePassed();
@@ -108,5 +108,39 @@ contract Raffle is VRFConsumerBaseV2 {
         s_lastWinnerDrawn = winnerAddress;
         s_lastWinnerDrawnTime = block.timestamp;
         payWinner(payable(winnerAddress));
+    }
+
+    /**
+     * @dev checkUpKeep functin returns true if :
+        1. Enough interval has passed
+        2. Contract has balance (participants exist)
+        3. Raffle state is OPEN
+        4. Subscription is funded with LINK
+     * @return upkeepNeeded 
+     * @return boolean
+     */
+    function checkUpkeep(
+        bytes memory /* checkData */
+    ) public view returns (bool upkeepNeeded, bytes memory /* performData */) {
+        bool enoughIntervalPassed = block.timestamp - s_lastWinnerDrawnTime >=
+            i_minTimeInterval;
+        bool hasBalance = address(this).balance > 0;
+        bool isOpenState = s_currentRaffleState == RaffleState.OPEN;
+        bool hasPlayers = s_participants.length > 0;
+
+        upkeepNeeded =
+            enoughIntervalPassed &&
+            hasBalance &&
+            hasPlayers &&
+            isOpenState;
+        return (upkeepNeeded, "0x0");
+        // We don't use the checkData in this example. The checkData is defined when the Upkeep was registered.
+    }
+
+    function performUpkeep(bytes calldata /* performData */) external {
+        (bool upKeep, ) = checkUpkeep("");
+        if (upKeep) {
+            pickWinner();
+        }
     }
 }
