@@ -27,15 +27,15 @@ contract Raffle is VRFConsumerBaseV2 {
     }
 
     RaffleState s_currentRaffleState;
-    uint256 private immutable i_ticketPrice;
+    uint256 private immutable i_entryFees;
     VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
     bytes32 private immutable i_gasLane;
     uint64 private immutable i_subscriptionId;
     uint256 private immutable i_minTimeInterval;
+    uint32 private immutable i_vrfGasLimit;
 
     uint16 private constant REQUIRED_CONFIRMATIONS = 3;
     uint32 private constant NUM_WORDS = 1;
-    uint32 private constant VRF_GAS_LIMIT = 100000;
 
     address private s_lastWinnerDrawn;
     uint256 private s_lastWinnerDrawnTime;
@@ -48,23 +48,25 @@ contract Raffle is VRFConsumerBaseV2 {
     address payable[] private s_participants;
 
     constructor(
-        uint256 ticketPrice,
+        uint256 entryFees,
         address vrfCoordinator,
         bytes32 gasLane,
         uint64 subscriptionId,
-        uint256 minTimeInterval
+        uint256 minTimeInterval,
+        uint32 vrfGasLimit
     ) VRFConsumerBaseV2(vrfCoordinator) {
-        i_ticketPrice = ticketPrice;
+        i_entryFees = entryFees;
         i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinator);
         i_gasLane = gasLane;
         i_subscriptionId = subscriptionId;
+        i_vrfGasLimit = vrfGasLimit;
         s_lastWinnerDrawnTime = block.timestamp;
         i_minTimeInterval = minTimeInterval;
         s_currentRaffleState = RaffleState.OPEN;
     }
 
     function enterRaffle() public payable {
-        if (msg.value < i_ticketPrice) {
+        if (msg.value < i_entryFees) {
             revert Raffle__NotEnoughEntryFeesPaid();
         }
         if (s_currentRaffleState != RaffleState.OPEN) revert();
@@ -82,7 +84,7 @@ contract Raffle is VRFConsumerBaseV2 {
             i_gasLane,
             i_subscriptionId,
             REQUIRED_CONFIRMATIONS,
-            VRF_GAS_LIMIT,
+            i_vrfGasLimit,
             NUM_WORDS
         );
         emit pickWinnerStarted(requestId, block.timestamp);
