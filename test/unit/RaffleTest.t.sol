@@ -19,7 +19,7 @@ contract RaffleTest is Test {
         vm.deal(USER, USER_BALANCE);
     }
 
-    function testRaffleIsOpen() external {
+    function testRaffleIsOpen() external view {
         assert(raffle.getRaffleState() == Raffle.RaffleState.OPEN);
     }
 
@@ -38,11 +38,11 @@ contract RaffleTest is Test {
         //enter raffle first time
         raffle.enterRaffle{value: TICKET_PRICE}();
         vm.warp(block.timestamp + raffle.getMinInterval());
-
+        vm.roll(10);
         //start winner picking to put raffle into calculating
         raffle.performUpkeep("0x0");
 
-        vm.expectRevert();
+        vm.expectRevert(Raffle.Raffle__RaffleIsCalculating.selector);
 
         //try to enter raffle while its calculating
         raffle.enterRaffle{value: TICKET_PRICE}();

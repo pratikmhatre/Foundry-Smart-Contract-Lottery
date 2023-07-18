@@ -4,8 +4,11 @@ pragma solidity ^0.8.18;
 import {HelperConfig} from "./HelperConfig.s.sol";
 import {DeployRaffle} from "../script/DeployRaffle.s.sol";
 import {VRFCoordinatorV2Mock} from "@chainlink/contracts/src/v0.8/mocks/VRFCoordinatorV2Mock.sol";
+import {VRFCoordinatorV2Interface} from "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import {Raffle} from "../src/Raffle.sol";
 import {Script} from "forge-std/Script.sol";
+import {LinkToken} from "../test/mock/LinkToken.sol";
+import {DevOpsTools} from "lib/foundry-devops/src/DevOpsTools.sol";
 
 /// @title Create Subscription
 /// @author Pratik
@@ -17,7 +20,7 @@ contract CreateSubscription is Script {
 
     function createSubscriptionWithConfig() internal returns (uint64) {
         HelperConfig config = new HelperConfig();
-        (, address vrfCoordinator, , , , ) = config.activeConfig();
+        (, address vrfCoordinator, , , , , ) = config.activeConfig();
         return createSubscription(vrfCoordinator);
     }
 
@@ -38,7 +41,7 @@ contract CreateSubscription is Script {
 /// @author Pratik
 /// @dev The contract is called for adding funds to an already created subscription wheather on local host or on testnet.
 contract FundSubscription is Script {
-    uint96 constant FUNDING_AMOUNT = 1 ether;
+    uint96 constant FUNDING_AMOUNT = 3 ether;
 
     function run() external {
         fundSubscriptionUsingConfig();
@@ -46,11 +49,16 @@ contract FundSubscription is Script {
 
     function fundSubscriptionUsingConfig() internal {
         HelperConfig config = new HelperConfig();
-        (, address vrfAddress, , uint64 subId, , ) = config.activeConfig();
-        fundSubscription(vrfAddress, subId);
+        (, address vrfAddress, , uint64 subId, , , address link) = config
+            .activeConfig();
+        fundSubscription(vrfAddress, subId, link);
     }
 
-    function fundSubscription(address vrfAddress, uint64 subId) public {
+    function fundSubscription(
+        address vrfAddress,
+        uint64 subId,
+        address link
+    ) public {
         if (block.chainid == 31337) {
             //anvil
             vm.startBroadcast();
@@ -59,7 +67,15 @@ contract FundSubscription is Script {
             );
             vm.stopBroadcast();
             mockCoordinator.fundSubscription(subId, FUNDING_AMOUNT);
-        } else {}
+        } else {
+            vm.startBroadcast();
+            LinkToken(link).transferAndCall(
+                vrfAddress,
+                FUNDING_AMOUNT,
+                abi.encode(subId)
+            );
+            vm.stopBroadcast();
+        }
     }
 }
 
@@ -69,18 +85,34 @@ contract AddConsumer is Script {
     }
 
     function addConsumerUsingConfig() internal {
-        DeployRaffle deploy = new DeployRaffle();
-        (Raffle raffle, HelperConfig config) = deploy.run();
-        (, address vrfAddress, , uint64 subId, , ) = config.activeConfig();
+        address raffle = DevOpsTools.get_most_recent_deployment(
+            "Raffle",
+            block.chainid
+        );
+        HelperConfig config = new HelperConfig();
+        (, address vrfAddress, , uint64 subId, , , ) = config.activeConfig();
         addConsumer(vrfAddress, subId, raffle);
     }
 
     function addConsumer(
         address vrfAddress,
         uint64 subId,
-        Raffle raffle
+        address raffle
     ) public {
-        VRFCoordinatorV2Mock mockCoordinator = VRFCoordinatorV2Mock(vrfAddress);
-        mockCoordinator.addConsumer(subId, address(raffle));
+        if (block.chainid == 31337) {
+            vm.startBroadcast();
+            VRFCoordinatorV2Mock mockCoordinator = VRFCoordinatorV2Mock(
+                vrfAddress
+            );
+            mockCoordinator.addConsumer(subId, raffle);
+            vm.stopBroadcast();
+        } else {
+            vm.startBroadcast();
+            VRFCoordinatorV2Interface vrfCoordinator = VRFCoordinatorV2Interface(
+                    vrfAddress
+                );
+            vrfCoordinator.addConsumer(subId, raffle);
+            vm.stopBroadcast();
+        }
     }
 }

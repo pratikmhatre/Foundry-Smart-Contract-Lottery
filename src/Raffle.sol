@@ -44,6 +44,7 @@ contract Raffle is VRFConsumerBaseV2 {
     error Raffle__VRF_REQUEST_FAILED();
     error Raffle__NoEnoughTimePassed();
     error Raffle__RewardingWinnerFailed();
+    error Raffle__RaffleIsCalculating();
 
     address payable[] private s_participants;
 
@@ -69,7 +70,8 @@ contract Raffle is VRFConsumerBaseV2 {
         if (msg.value < i_entryFees) {
             revert Raffle__NotEnoughEntryFeesPaid();
         }
-        if (s_currentRaffleState != RaffleState.OPEN) revert();
+        if (s_currentRaffleState != RaffleState.OPEN)
+            revert Raffle__RaffleIsCalculating();
 
         s_participants.push(payable(msg.sender));
         emit userEnteredRaffle(msg.sender, block.timestamp);
@@ -151,7 +153,7 @@ contract Raffle is VRFConsumerBaseV2 {
         return s_currentRaffleState;
     }
 
-    function getParticipant(uint index) public returns (address) {
+    function getParticipant(uint index) public view returns (address) {
         return s_participants[index];
     }
 
