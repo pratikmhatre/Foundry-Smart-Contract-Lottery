@@ -12,6 +12,7 @@ contract HelperConfig is Script {
         uint64 subscriptionId;
         uint256 minTimeInterval;
         uint32 vrfGasLimit;
+        address link;
     }
 
     ActiveConfig public activeConfig;
@@ -38,7 +39,8 @@ contract HelperConfig is Script {
                 gasLane: gasLane,
                 subscriptionId: 1211,
                 minTimeInterval: 30,
-                vrfGasLimit: 100000
+                vrfGasLimit: 100000,
+                link: 0x779877A7B0D9E8603169DdbD7836e478b4624789
             });
     }
 

@@ -79,7 +79,9 @@ contract Raffle is VRFConsumerBaseV2 {
         //check if enough time interval has passed since last pickWinner
         if (block.timestamp - s_lastWinnerDrawnTime < i_minTimeInterval)
             revert Raffle__NoEnoughTimePassed();
+
         s_currentRaffleState = RaffleState.CALCULATING;
+
         uint256 requestId = i_vrfCoordinator.requestRandomWords(
             i_gasLane,
             i_subscriptionId,
@@ -136,7 +138,6 @@ contract Raffle is VRFConsumerBaseV2 {
             hasPlayers &&
             isOpenState;
         return (upkeepNeeded, "0x0");
-        // We don't use the checkData in this example. The checkData is defined when the Upkeep was registered.
     }
 
     function performUpkeep(bytes calldata /* performData */) external {
@@ -144,5 +145,17 @@ contract Raffle is VRFConsumerBaseV2 {
         if (upKeep) {
             pickWinner();
         }
+    }
+
+    function getRaffleState() public view returns (RaffleState) {
+        return s_currentRaffleState;
+    }
+
+    function getParticipant(uint index) public returns (address) {
+        return s_participants[index];
+    }
+
+    function getMinInterval() public view returns (uint256) {
+        return i_minTimeInterval;
     }
 }
