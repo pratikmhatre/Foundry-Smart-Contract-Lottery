@@ -11,14 +11,14 @@ import {VRFConsumerBaseV2} from "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2
  */
 
 contract Raffle is VRFConsumerBaseV2 {
-    event userEnteredRaffle(address userAddress, uint256 time);
-    event winnerPicked(address winnerAddress, uint256 time);
-    event winnerPaid(
-        address winnerAddress,
+    event UserEnteredRaffle(address indexed userAddress, uint256 time);
+    event WinnerPicked(address indexed winnerAddress, uint256 time);
+    event WinnerPaid(
+        address indexed winnerAddress,
         uint256 winningAmmount,
         uint256 time
     );
-    event pickWinnerStarted(uint256 requestId, uint256 time);
+    event PickWinnerStarted(uint256 requestId, uint256 time);
 
     enum RaffleState {
         OPEN,
@@ -27,36 +27,31 @@ contract Raffle is VRFConsumerBaseV2 {
     }
 
     RaffleState s_currentRaffleState;
-    uint256 private immutable i_entryFees;
+    uint256 private constant TICKET_PRICE = 0.001 ether;
     VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
     bytes32 private immutable i_gasLane;
     uint64 private immutable i_subscriptionId;
     uint256 private immutable i_minTimeInterval;
     uint32 private immutable i_vrfGasLimit;
 
-    uint16 private constant REQUIRED_CONFIRMATIONS = 3;
-    uint32 private constant NUM_WORDS = 1;
-
     address private s_lastWinnerDrawn;
     uint256 private s_lastWinnerDrawnTime;
 
     error Raffle__NotEnoughEntryFeesPaid();
-    error Raffle__VRF_REQUEST_FAILED();
     error Raffle__NoEnoughTimePassed();
     error Raffle__RewardingWinnerFailed();
     error Raffle__RaffleIsCalculating();
+    error Raffle__NotEnoughPlayers();
 
     address payable[] private s_participants;
 
     constructor(
-        uint256 entryFees,
         address vrfCoordinator,
         bytes32 gasLane,
         uint64 subscriptionId,
         uint256 minTimeInterval,
         uint32 vrfGasLimit
     ) VRFConsumerBaseV2(vrfCoordinator) {
-        i_entryFees = entryFees;
         i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinator);
         i_gasLane = gasLane;
         i_subscriptionId = subscriptionId;
@@ -67,53 +62,22 @@ contract Raffle is VRFConsumerBaseV2 {
     }
 
     function enterRaffle() public payable {
-        if (msg.value < i_entryFees) {
+        if (msg.value < TICKET_PRICE) {
             revert Raffle__NotEnoughEntryFeesPaid();
         }
         if (s_currentRaffleState != RaffleState.OPEN)
             revert Raffle__RaffleIsCalculating();
 
         s_participants.push(payable(msg.sender));
-        emit userEnteredRaffle(msg.sender, block.timestamp);
-    }
-
-    function pickWinner() internal {
-        //check if enough time interval has passed since last pickWinner
-        if (block.timestamp - s_lastWinnerDrawnTime < i_minTimeInterval)
-            revert Raffle__NoEnoughTimePassed();
-
-        s_currentRaffleState = RaffleState.CALCULATING;
-
-        uint256 requestId = i_vrfCoordinator.requestRandomWords(
-            i_gasLane,
-            i_subscriptionId,
-            REQUIRED_CONFIRMATIONS,
-            i_vrfGasLimit,
-            NUM_WORDS
-        );
-        emit pickWinnerStarted(requestId, block.timestamp);
+        emit UserEnteredRaffle(msg.sender, block.timestamp);
     }
 
     function payWinner(address payable winner) internal {
-        emit winnerPicked(winner, block.timestamp);
+        emit WinnerPicked(winner, block.timestamp);
         uint256 contractBalance = address(this).balance;
         (bool isSuccess, ) = winner.call{value: contractBalance}("");
         if (!isSuccess) revert Raffle__RewardingWinnerFailed();
-        emit winnerPaid(winner, contractBalance, block.timestamp);
-    }
-
-    function fulfillRandomWords(
-        uint256 _requestId,
-        uint256[] memory _randomWords
-    ) internal override {
-        s_currentRaffleState = RaffleState.OPEN;
-        if (_randomWords.length < NUM_WORDS)
-            revert Raffle__VRF_REQUEST_FAILED();
-        uint256 winnerIndex = _randomWords[0] % s_participants.length;
-        address winnerAddress = s_participants[winnerIndex];
-        s_lastWinnerDrawn = winnerAddress;
-        s_lastWinnerDrawnTime = block.timestamp;
-        payWinner(payable(winnerAddress));
+        emit WinnerPaid(winner, contractBalance, block.timestamp);
     }
 
     /**
@@ -145,8 +109,38 @@ contract Raffle is VRFConsumerBaseV2 {
     function performUpkeep(bytes calldata /* performData */) external {
         (bool upKeep, ) = checkUpkeep("");
         if (upKeep) {
-            pickWinner();
+            s_currentRaffleState = RaffleState.CALCULATING;
+
+            uint256 requestId = i_vrfCoordinator.requestRandomWords(
+                i_gasLane,
+                i_subscriptionId,
+                3,
+                i_vrfGasLimit,
+                1
+            );
+            emit PickWinnerStarted(requestId, block.timestamp);
         }
+    }
+
+    function fulfillRandomWords(
+        uint256,
+        uint256[] memory _randomWords
+    ) internal override {
+        s_currentRaffleState = RaffleState.OPEN;
+
+        uint256 winnerIndex = _randomWords[0] % s_participants.length;
+        address winnerAddress = s_participants[winnerIndex];
+        s_lastWinnerDrawn = winnerAddress;
+        s_lastWinnerDrawnTime = block.timestamp;
+        payWinner(payable(winnerAddress));
+    }
+
+    function getLastWinner() public view returns (address) {
+        return s_lastWinnerDrawn;
+    }
+
+    function getLastDrawnTime() public view returns (uint256) {
+        return s_lastWinnerDrawnTime;
     }
 
     function getRaffleState() public view returns (RaffleState) {

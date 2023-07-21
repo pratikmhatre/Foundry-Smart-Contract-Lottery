@@ -20,17 +20,19 @@ contract CreateSubscription is Script {
 
     function createSubscriptionWithConfig() internal returns (uint64) {
         HelperConfig config = new HelperConfig();
-        (, address vrfCoordinator, , , , , ) = config.activeConfig();
-        return createSubscription(vrfCoordinator);
+        (address vrfCoordinator, , , , , , uint256 deployerId) = config
+            .activeConfig();
+        return createSubscription(vrfCoordinator, deployerId);
     }
 
     function createSubscription(
-        address vrfCoordinator
+        address vrfCoordinator,
+        uint256 deployerId
     ) public returns (uint64) {
         VRFCoordinatorV2Mock mockCoordinator = VRFCoordinatorV2Mock(
             vrfCoordinator
         );
-        vm.startBroadcast();
+        vm.startBroadcast(deployerId);
         uint64 subId = mockCoordinator.createSubscription();
         vm.stopBroadcast();
         return subId;
@@ -49,26 +51,34 @@ contract FundSubscription is Script {
 
     function fundSubscriptionUsingConfig() internal {
         HelperConfig config = new HelperConfig();
-        (, address vrfAddress, , uint64 subId, , , address link) = config
-            .activeConfig();
-        fundSubscription(vrfAddress, subId, link);
+        (
+            address vrfAddress,
+            ,
+            uint64 subId,
+            ,
+            ,
+            address link,
+            uint256 deployerId
+        ) = config.activeConfig();
+        fundSubscription(vrfAddress, subId, link, deployerId);
     }
 
     function fundSubscription(
         address vrfAddress,
         uint64 subId,
-        address link
+        address link,
+        uint256 deployerId
     ) public {
         if (block.chainid == 31337) {
             //anvil
-            vm.startBroadcast();
+            vm.startBroadcast(deployerId);
             VRFCoordinatorV2Mock mockCoordinator = VRFCoordinatorV2Mock(
                 vrfAddress
             );
             vm.stopBroadcast();
             mockCoordinator.fundSubscription(subId, FUNDING_AMOUNT);
         } else {
-            vm.startBroadcast();
+            vm.startBroadcast(deployerId);
             LinkToken(link).transferAndCall(
                 vrfAddress,
                 FUNDING_AMOUNT,
@@ -90,29 +100,31 @@ contract AddConsumer is Script {
             block.chainid
         );
         HelperConfig config = new HelperConfig();
-        (, address vrfAddress, , uint64 subId, , , ) = config.activeConfig();
-        addConsumer(vrfAddress, subId, raffle);
+        (address vrfAddress, , uint64 subId, , , , uint256 deployerId) = config
+            .activeConfig();
+        addConsumer(vrfAddress, subId, raffle, deployerId);
     }
 
     function addConsumer(
         address vrfAddress,
         uint64 subId,
-        address raffle
+        address raffle,
+        uint256 deployerId
     ) public {
-        if (block.chainid == 31337) {
-            vm.startBroadcast();
-            VRFCoordinatorV2Mock mockCoordinator = VRFCoordinatorV2Mock(
-                vrfAddress
-            );
-            mockCoordinator.addConsumer(subId, raffle);
-            vm.stopBroadcast();
-        } else {
-            vm.startBroadcast();
-            VRFCoordinatorV2Interface vrfCoordinator = VRFCoordinatorV2Interface(
-                    vrfAddress
-                );
-            vrfCoordinator.addConsumer(subId, raffle);
-            vm.stopBroadcast();
-        }
+        vm.startBroadcast(deployerId);
+        VRFCoordinatorV2Mock mockCoordinator = VRFCoordinatorV2Mock(vrfAddress);
+        mockCoordinator.addConsumer(subId, raffle);
+        vm.stopBroadcast();
+
+        // if (block.chainid == 31337) {
+
+        // } else {
+        //     vm.startBroadcast();
+        //     VRFCoordinatorV2Interface vrfCoordinator = VRFCoordinatorV2Interface(
+        //             vrfAddress
+        //         );
+        //     vrfCoordinator.addConsumer(subId, raffle);
+        //     vm.stopBroadcast();
+        // }
     }
 }

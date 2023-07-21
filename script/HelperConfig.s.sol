@@ -7,13 +7,13 @@ import {LinkToken} from "../test/mock/LinkToken.sol";
 
 contract HelperConfig is Script {
     struct ActiveConfig {
-        uint256 entryFees;
         address vrfCoordinator;
         bytes32 gasLane;
         uint64 subscriptionId;
         uint256 minTimeInterval;
         uint32 vrfGasLimit;
         address link;
+        uint256 deployerKey;
     }
 
     ActiveConfig public activeConfig;
@@ -28,20 +28,20 @@ contract HelperConfig is Script {
         }
     }
 
-    function getSepoliaConfig() internal pure returns (ActiveConfig memory) {
+    function getSepoliaConfig() internal view returns (ActiveConfig memory) {
         bytes32 gasLane = 0x474e34a077df58807dbe9c96d3c009b23b3c6d0cce433e59bbf5b34f823bc56c;
 
         address coordinatorAddress = 0x8103B0A8A00be2DDC778e6e7eaa21791Cd364625;
 
         return
             ActiveConfig({
-                entryFees: 0.001 ether,
                 vrfCoordinator: coordinatorAddress,
                 gasLane: gasLane,
                 subscriptionId: 3671,
                 minTimeInterval: 30,
                 vrfGasLimit: 100000,
-                link: 0x779877A7B0D9E8603169DdbD7836e478b4624789
+                link: 0x779877A7B0D9E8603169DdbD7836e478b4624789,
+                deployerKey: uint256(vm.envUint("TESTNET_PRIVATE_KEY"))
             });
     }
 
@@ -58,13 +58,15 @@ contract HelperConfig is Script {
 
         return
             ActiveConfig({
-                entryFees: 0.001 ether,
                 vrfCoordinator: coordinatorAddress,
                 gasLane: gasLane,
                 subscriptionId: 0,
                 minTimeInterval: 30,
                 vrfGasLimit: 100000,
-                link: address(linkToken)
+                link: address(linkToken),
+                deployerKey: uint256(
+                    0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+                )
             });
     }
 }
