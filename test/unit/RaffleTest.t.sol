@@ -46,6 +46,15 @@ contract RaffleTest is Test {
         vm.deal(USER, USER_BALANCE);
     }
 
+    function testParticipantCountReturnsNumberOfParticipants() external {
+        for (uint i = 1; i <= 5; i++) {
+            address user = address(uint160(i));
+            hoax(user, 1 ether);
+            raffle.enterRaffle{value: TICKET_PRICE}();
+        }
+        assert(raffle.getParticipantCount() == 5);
+    }
+
     function testRaffleIsOpen() external view {
         assert(raffle.getRaffleState() == Raffle.RaffleState.OPEN);
     }

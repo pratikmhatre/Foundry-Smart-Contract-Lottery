@@ -3,6 +3,7 @@ pragma solidity ^0.8.18;
 
 import {VRFCoordinatorV2Interface} from "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import {VRFConsumerBaseV2} from "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
+import {AutomationCompatibleInterface} from "@chainlink/contracts/src/v0.8/interfaces/AutomationCompatibleInterface.sol";
 
 /**
  * @title Raffle Contract
@@ -10,7 +11,7 @@ import {VRFConsumerBaseV2} from "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2
  * @notice This contract holds the functionality of a Raffle to let users participate in a lottery system by paying for a ticket; at a perticular interval a random user is picked using Chainlink VRF and all the balance is transferred to the winner.
  */
 
-contract Raffle is VRFConsumerBaseV2 {
+contract Raffle is VRFConsumerBaseV2, AutomationCompatibleInterface {
     event UserEnteredRaffle(address indexed userAddress, uint256 time);
     event WinnerPicked(address indexed winnerAddress, uint256 time);
     event WinnerPaid(
@@ -91,7 +92,12 @@ contract Raffle is VRFConsumerBaseV2 {
      */
     function checkUpkeep(
         bytes memory /* checkData */
-    ) public view returns (bool upkeepNeeded, bytes memory /* performData */) {
+    )
+        public
+        view
+        override
+        returns (bool upkeepNeeded, bytes memory /* performData */)
+    {
         bool enoughIntervalPassed = block.timestamp - s_lastWinnerDrawnTime >=
             i_minTimeInterval;
         bool hasBalance = address(this).balance > 0;
@@ -106,7 +112,7 @@ contract Raffle is VRFConsumerBaseV2 {
         return (upkeepNeeded, "0x0");
     }
 
-    function performUpkeep(bytes calldata /* performData */) external {
+    function performUpkeep(bytes calldata /* performData */) external override {
         (bool upKeep, ) = checkUpkeep("");
         if (upKeep) {
             s_currentRaffleState = RaffleState.CALCULATING;
@@ -153,5 +159,9 @@ contract Raffle is VRFConsumerBaseV2 {
 
     function getMinInterval() public view returns (uint256) {
         return i_minTimeInterval;
+    }
+
+    function getParticipantCount() public view returns (uint256) {
+        return s_participants.length;
     }
 }
